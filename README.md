@@ -26,12 +26,6 @@ Templomok térképe egy adott városban. Később miserenddel is. :)
 6. Elmenti a térképet
 
 ## Minta
-
-### Kevésbé színes térkép
-
 ![Kevésbé színes térkép](terkep.png)
-
-### Színesebb térkép
-
 ![Színesebb térkép](terkep_szines.png)
 
