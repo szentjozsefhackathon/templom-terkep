@@ -24,7 +24,7 @@ def get_nearby_churches(lat, lon, distance):
     distance += 500
     url = "http://miserend.hu/api/v4/nearby"
     headers = {"Content-Type": "application/json"}
-    data = {"lat": lat, "lon": lon, "limit": 100}
+    data = {"lat": lat, "lon": lon, "limit": 100, "whenMass": "sunday"}
     response = requests.post(url, json=data, headers=headers)
     if response.status_code == 200:
         return list(filter(lambda church: church["tavolsag"] <= distance, response.json()["templomok"]))
@@ -56,23 +56,54 @@ def get_city_map(output_filename, churches, show_center=False, color_map=False):
         ax.scatter(center_lon, center_lat, c='blue', marker='x', s=100, label='Középpont')
 
     texts = []  # Szövegelemek listája az adjustText-hez
+    text_objects = []  # Szövegelemek listája az interakcióhoz
     for church in churches:
         lon, lat = church['lon'], church['lat']
         name = church.get('nev', 'Ismeretlen templom')
         
         # Templom ikon (kereszt) megjelenítése
         ax.scatter(lon, lat, c='red', marker='o', s=100, label='Templom')
-        
         # Szöveg hozzáadása és elmentése az adjustText számára
-        text = ax.text(lon, lat, f"{name}",
+        text = ax.text(lon, lat, f"{name}\n{', '.join([':'.join(mass["idopont"].split(" ")[1].split(":")[:2]) for mass in church["misek"]])}",
                        fontsize=8, ha='center', va='bottom', bbox=dict(facecolor='white', alpha=0.7, edgecolor='black'))
         texts.append(text)
+        text_objects.append(text)
     
     # Automatikus címkeelrendezés
-    adjust_text(texts, ax=ax, arrowprops=dict(arrowstyle="->", color='black'), min_arrow_len=100)
+    adjust_text(texts, ax=ax, max_move=(200,200), time_lim=20, arrowprops=dict(arrowstyle="->", color='black'), min_arrow_len=200)
+    
+    def on_press(event):
+        for text in text_objects:
+            if text.contains(event)[0]:
+                text.user_data = (event.xdata, event.ydata)
+                text.set_bbox(dict(facecolor='yellow', alpha=0.7, edgecolor='black'))
+                fig.canvas.draw()
+                return
+
+    def on_motion(event):
+        for text in text_objects:
+            if hasattr(text, 'user_data') and event.xdata and event.ydata:
+                text.set_position((event.xdata, event.ydata))
+                fig.canvas.draw()
+                return
+
+    def on_release(event):
+        for text in text_objects:
+            if hasattr(text, 'user_data'):
+                del text.user_data
+                text.set_bbox(dict(facecolor='white', alpha=0.7, edgecolor='black'))
+                fig.canvas.draw()
+                return
+
+    fig.canvas.mpl_connect('button_press_event', on_press)
+    fig.canvas.mpl_connect('motion_notify_event', on_motion)
+    fig.canvas.mpl_connect('button_release_event', on_release)
+    
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
+    print("A térkép elkészült. A szövegek húzásával átrendezheti őket.")
+    plt.show(block=True)  # Interaktív módon megjelenik, a felhasználó húzhatja a szövegeket
     fig.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"A térkép elmentve ide: {output_filename}")
 
