@@ -20,18 +20,18 @@ def get_city_coordinates(city_name):
     print("Nem található ilyen település.")
     return None, None
 
-def get_nearby_churches(lat, lon, distance):
+def get_nearby_churches(lat, lon, distance, hide_no_mass=False):
     distance += 500
     url = "http://miserend.hu/api/v4/nearby"
     headers = {"Content-Type": "application/json"}
     data = {"lat": lat, "lon": lon, "limit": 100, "whenMass": "sunday"}
     response = requests.post(url, json=data, headers=headers)
     if response.status_code == 200:
-        return list(filter(lambda church: church["tavolsag"] <= distance, response.json()["templomok"]))
+        return list(filter(lambda church: church["tavolsag"] <= distance and ((hide_no_mass and len(church["misek"])>0) or not hide_no_mass), response.json()["templomok"]))
     print(f"Hiba történt az API-hívás során: {response.status_code}")
     return []
 
-def get_city_map(output_filename, churches, show_center=False, color_map=False):
+def get_city_map(output_filename, churches, show_center=False, color_map=False, mass_scheduling=False):
     if not churches:
         print("Nincsenek templomok a megadott tartományban.")
         return
@@ -44,8 +44,14 @@ def get_city_map(output_filename, churches, show_center=False, color_map=False):
     
     center_lat = (north + south) / 2
     center_lon = (east + west) / 2
-    fig, ax = plt.subplots(figsize=(10, 10))
-    
+    fig, ax = plt.subplots(figsize=(8, 8), frameon=False)
+    ax.set_adjustable('box')
+    ax.set_aspect('equal')
+    for spine in ['top', 'right', 'left', 'bottom']:
+        ax.spines[spine].set_visible(False)
+
+    fig.subplots_adjust(0, 0, 1, 1, 0, 0)
+    fig.tight_layout()
     ax.set_xlim(west, east)
     ax.set_ylim(south, north)
     source = ctx.providers.CartoDB.Positron if not color_map else ctx.providers.OpenStreetMap.Mapnik
@@ -64,7 +70,9 @@ def get_city_map(output_filename, churches, show_center=False, color_map=False):
         # Templom ikon (kereszt) megjelenítése
         ax.scatter(lon, lat, c='red', marker='o', s=100, label='Templom')
         # Szöveg hozzáadása és elmentése az adjustText számára
-        text = ax.text(lon, lat, f"{name}\n{', '.join([':'.join(mass["idopont"].split(" ")[1].split(":")[:2]) for mass in church["misek"]])}",
+        mass_sched = "" if not mass_scheduling else f"\n{', '.join([':'.join(mass["idopont"].split(" ")[1].split(":")[:2]) for mass in church['misek']])}"
+        mass_sched = mass_sched if mass_sched != "\n" else ""
+        text = ax.text(lon, lat, f"{name}{mass_sched}",
                        fontsize=8, ha='center', va='bottom', bbox=dict(facecolor='white', alpha=0.7, edgecolor='black'))
         texts.append(text)
         text_objects.append(text)
@@ -102,9 +110,11 @@ def get_city_map(output_filename, churches, show_center=False, color_map=False):
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
-    print("A térkép elkészült. A szövegek húzásával átrendezheti őket.")
+    print("A térkép elkészült. A szövegek húzással átrendezhetőek. A végleges elrendezés után zárja be az ablakot")
+    plt.box(on=None)
+    plt.axis('off')
     plt.show(block=True)  # Interaktív módon megjelenik, a felhasználó húzhatja a szövegeket
-    fig.savefig(output_filename, dpi=300, bbox_inches='tight')
+    fig.savefig(output_filename, dpi=300, bbox_inches='tight', pad_inches=0)
     print(f"A térkép elmentve ide: {output_filename}")
 
 def select_churches(churches):
@@ -121,6 +131,8 @@ def main():
     parser.add_argument("--show-center", action="store_true", help="A középpont megjelenítése")
     parser.add_argument("--select-churches", action="store_true", help="Templomok kiválasztása")
     parser.add_argument("--color-map", action="store_true", help="Színes térkép")
+    parser.add_argument("--mass-scheduling", action="store_true", help="Misek időpontjainak megjelenítése")
+    parser.add_argument("--hide-no-mass", action="store_true", help="Nem miséző templomok elrejtése")
     args = parser.parse_args()
     
     city_name = args.city_name or input("Adja meg a település nevét (Szeged): ") or "Szeged"
@@ -136,11 +148,11 @@ def main():
     if lat is None or lon is None:
         return
     
-    churches = get_nearby_churches(lat, lon, distance)
+    churches = get_nearby_churches(lat, lon, distance, hide_no_mass=args.hide_no_mass)
     if args.select_churches:
         churches = select_churches(churches)
 
-    get_city_map(output_filename, churches, show_center=args.show_center, color_map=args.color_map)
+    get_city_map(output_filename, churches, show_center=args.show_center, color_map=args.color_map, mass_scheduling=args.mass_scheduling)
 
 if __name__ == "__main__":
     main()
