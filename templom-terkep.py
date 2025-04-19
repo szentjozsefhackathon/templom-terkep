@@ -45,6 +45,14 @@ def get_city_map(output_filename, churches, show_center=False, color_map=False, 
     center_lat = (north + south) / 2
     center_lon = (east + west) / 2
     fig, ax = plt.subplots(figsize=(8, 8), frameon=False)
+    
+    def on_resize(event):
+        ax.set_xlim(west, east)
+        ax.set_ylim(south, north)
+        fig.canvas.draw()
+
+    fig.canvas.mpl_connect("resize_event", on_resize)
+
     ax.set_adjustable('box')
     ax.set_aspect('equal')
     for spine in ['top', 'right', 'left', 'bottom']:
@@ -70,7 +78,7 @@ def get_city_map(output_filename, churches, show_center=False, color_map=False, 
         # Templom ikon (kereszt) megjelenítése
         ax.scatter(lon, lat, c='red', marker='o', s=100, label='Templom')
         # Szöveg hozzáadása és elmentése az adjustText számára
-        mass_sched = "" if not mass_scheduling else f"\n{', '.join([':'.join(mass["idopont"].split(" ")[1].split(":")[:2]) for mass in church['misek']])}"
+        mass_sched = "" if not mass_scheduling else f"\n{', '.join([':'.join(mass['idopont'].split(' ')[1].split(':')[:2]) for mass in church['misek']])}"
         mass_sched = mass_sched if mass_sched != "\n" else ""
         text = ax.text(lon, lat, f"{name}{mass_sched}",
                        fontsize=8, ha='center', va='bottom', bbox=dict(facecolor='white', alpha=0.7, edgecolor='black'))
@@ -119,7 +127,7 @@ def get_city_map(output_filename, churches, show_center=False, color_map=False, 
 
 def select_churches(churches):
     title = "Válassza ki a templomokat: (szóköz a kiválasztáshoz, Enter a folytatáshoz)"
-    options = [f"{church.get('nev', 'Ismeretlen templom')} ({church.get('tavolsag','?')} m)" for church in churches]
+    options = [f"{church.get('nev', 'Ismeretlen templom')} ({church.get('tavolsag','?')} m, {len(church['misek'])} mise)" for church in churches]
     selected = pick(options, title, multiselect=True)
     return [churches[i[1]] for i in selected]
 
