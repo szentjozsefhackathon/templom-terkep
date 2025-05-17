@@ -1,42 +1,52 @@
 <!DOCTYPE html>
 <html lang="hu">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Templom Térkép</title>
-    
-    <!-- Bootstrap CSS -->
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Leaflet CSS -->
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin=""/>
-    
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script type="text/javascript" src="map-easyPrint/bundle.js"></script>
+
     <style>
         #map {
             height: 75vh;
             width: 100%;
             border-radius: 8px;
         }
+
         .card {
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
+
         body {
             padding-top: 20px;
             padding-bottom: 20px;
         }
+
         .church-popup {
             max-width: 300px;
         }
+
         .church-info {
             margin-top: 5px;
             font-size: 0.9em;
         }
+
         #loading {
             display: none;
             margin-top: 10px;
         }
+
         .mass-schedule-container {
             position: absolute;
             background-color: rgba(255, 255, 255, 0.9);
@@ -49,10 +59,12 @@
             z-index: 500;
             pointer-events: none;
         }
+
         .mass-schedule-list {
             margin: 0;
             padding-left: 15px;
         }
+
         .church-label {
             background-color: rgba(255, 255, 255, 0.8);
             padding: 2px 5px;
@@ -61,12 +73,33 @@
             color: #333;
             white-space: nowrap;
         }
+
+        .info {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+
+        .info h4 {
+            margin: 0 0 5px;
+            color: #777;
+        }
+
+        .legend {
+            text-align: left;
+            line-height: 18px;
+            color: #555;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1 class="text-center mb-4">Templom Térkép</h1>
-        
+
         <div class="row mb-4">
             <div class="col-md-12">
                 <div class="card">
@@ -75,13 +108,15 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="settlement" class="form-label">Település neve:</label>
-                                    <input type="text" class="form-control" id="settlement" placeholder="Adja meg a település nevét">
+                                    <input type="text" class="form-control" id="settlement"
+                                        placeholder="Adja meg a település nevét">
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="distance" class="form-label">Távolság (km):</label>
-                                    <input type="number" class="form-control" id="distance" placeholder="Távolság" min="1" max="100" value="10">
+                                    <input type="number" class="form-control" id="distance" placeholder="Távolság"
+                                        min="1" max="100" value="10">
                                 </div>
                             </div>
                             <div class="col-md-3">
@@ -89,20 +124,21 @@
                                     <label for="mass-date" class="form-label">Mise időpontja:</label>
                                     <div class="input-group">
                                         <select class="form-select" id="mass-date">
-                                            <option value="sunday" selected>Vasárnap</option>
-                                            <option value="saturday">Szombat</option>
+                                            <option value="today">Ma</option>
                                             <option value="monday">Hétfő</option>
                                             <option value="tuesday">Kedd</option>
                                             <option value="wednesday">Szerda</option>
                                             <option value="thursday">Csütörtök</option>
                                             <option value="friday">Péntek</option>
-                                            <option value="today">Ma</option>
+                                            <option value="saturday">Szombat</option>
+                                            <option value="sunday" selected>Vasárnap</option>
                                             <option value="custom">Egyedi dátum...</option>
                                         </select>
                                         <input type="date" class="form-control" id="custom-date" style="display: none;">
                                     </div>
                                     <div class="form-check mt-2" id="saturday-evening-container" style="display: none;">
-                                        <input class="form-check-input" type="checkbox" id="include-saturday-evening" checked>
+                                        <input class="form-check-input" type="checkbox" id="include-saturday-evening"
+                                            checked>
                                         <label class="form-check-label" for="include-saturday-evening">
                                             Előesti mise is (szombat 17:00 után)
                                         </label>
@@ -112,7 +148,8 @@
                             <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="church-limit" class="form-label">Templomok száma (max):</label>
-                                    <input type="number" class="form-control" id="church-limit" placeholder="Limit" min="1" max="1000" value="100">
+                                    <input type="number" class="form-control" id="church-limit" placeholder="Limit"
+                                        min="1" max="1000" value="100">
                                 </div>
                             </div>
                             <div class="col-md-12 d-flex justify-content-center">
@@ -142,8 +179,10 @@
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <button class="btn btn-outline-secondary btn-sm" id="select-all-btn">Összes kijelölése</button>
-                                    <button class="btn btn-outline-secondary btn-sm" id="deselect-all-btn">Kijelölések törlése</button>
+                                    <button class="btn btn-outline-secondary btn-sm" id="select-all-btn">Összes
+                                        kijelölése</button>
+                                    <button class="btn btn-outline-secondary btn-sm" id="deselect-all-btn">Kijelölések
+                                        törlése</button>
                                 </div>
                             </div>
                             <div id="church-list" class="mt-2 row">
@@ -154,7 +193,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="row">
             <div class="col-md-12">
                 <div class="card">
@@ -166,33 +205,53 @@
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
-    
     <script>
         // Térkép inicializálása (Magyarország középpontjával)
         const map = L.map('map').setView([47.162494, 19.503304], 7);
-        
+
+
+        var printer = L.easyPrint({
+            sizeModes: ['Current'],
+            filename: 'templomTerkep',
+            exportOnly: true,
+            hideControlContainer: true,
+
+        }).addTo(map);
         // OpenStreetMap alaptérkép hozzáadása
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
+        const title = L.control({ position: 'topright' });
+        title.onAdd = function (map) {
+
+            const div = L.DomUtil.create('div', 'info title');
+            div.innerHTML = `<h4>Miserend</h4><h5 id="varosNap"></h5><p id="eloestileiras" style="display: none;">ee: előesti szentmise szombaton</p>`;
+            return div;
+
+        };
+
+        title.addTo(map);
+
+        const logo = L.control({ position: 'bottomleft' });
+        logo.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'info ');
+            div.innerHTML = `<img src="hackathon_logo.png" alt="Szent József Hackathon" style="width: 100px; height: auto;">`;
+            return div;
+        };
+
+        logo.addTo(map);
+
         map.attributionControl.addAttribution('Forrás: <a href="https://miserend.hu/">Miserend.hu</a>');
-        
+
         // Templomok marker csoportja (törléshez)
         let churchMarkers = L.layerGroup().addTo(map);
-        
+
         // Eltároljuk a templomok adatait, hogy szűrni tudjunk közöttük
         let allChurches = [];
         let visibleChurchIds = new Set();
-        
+
         // Egyéni templom ikon
         const churchIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -202,7 +261,7 @@
             popupAnchor: [1, -34],
             shadowSize: [41, 41]
         });
-        
+
         // A miserend.hu API hívása a környékbeli templomok lekéréséhez
         async function getChurches(lat, lon, distance, whenMass = 'sunday', limit = 100) {
             try {
@@ -219,13 +278,13 @@
                         whenMass: whenMass
                     })
                 });
-                
+
                 if (!response.ok) {
                     throw new Error('Hiba a templomok lekérésénél');
                 }
-                
+
                 const data = await response.json();
-                
+
                 // A válasz formátumának ellenőrzése és a templomok tömbjének kinyerése
                 if (data && data.templomok) {
                     // A távolság szerinti szűrés, ahogy a Python kódban is van
@@ -241,22 +300,22 @@
                 throw error;
             }
         }
-        
+
         // Templom markerek elhelyezése a térképen
         function displayChurches(churches) {
             // Korábbi markerek törlése
             churchMarkers.clearLayers();
-            
+
             if (!churches || churches.length === 0) {
                 alert('Nem található templom a megadott távolságon belül.');
                 return;
             }
-            
+
             console.log('Talált templomok:', churches); // Debug információ
-            
+
             // Mentjük az összes templomot
             allChurches = churches;
-            
+
             // Kezdetben csak a miséket tartalmazó templomok lesznek láthatóak
             visibleChurchIds.clear();
             churches.forEach(church => {
@@ -264,25 +323,25 @@
                     visibleChurchIds.add(church.id.toString());
                 }
             });
-            
+
             // Listázzuk a templomokat a szűrő panelben
             populateChurchList(churches);
-            
+
             // Csak a kiválasztott templomok megjelenítése
             updateChurchMarkers();
-            
+
             // Térkép nézet beállítása, hogy az összes templom látható legyen
             fitMapToVisibleChurches();
-            
+
             // Szűrő panel megjelenítése
             document.getElementById('filter-options').style.display = 'block';
         }
-        
+
         // Térkép nézet beállítása a látható templomokhoz
         function fitMapToVisibleChurches() {
             // Ellenőrizzük, hogy vannak-e látható templomok
             if (visibleChurchIds.size === 0) return;
-            
+
             // Összegyűjtjük a látható templomok koordinátáit
             const visibleLocations = [];
             allChurches.forEach(church => {
@@ -291,29 +350,29 @@
                     visibleLocations.push([church.lat, church.lon]);
                 }
             });
-            
+
             // Ha nincs látható templom, nincs mit csinálni
             if (visibleLocations.length === 0) return;
-            
+
             // Beállítjuk a térképet, hogy az összes templom látható legyen
             const bounds = L.latLngBounds(visibleLocations);
             map.fitBounds(bounds, { padding: [50, 50] });
         }
-        
+
         // Templom lista létrehozása a szűréshez
         function populateChurchList(churches) {
             const churchListElement = document.getElementById('church-list');
             churchListElement.innerHTML = '';
-            
+
             churches.forEach(church => {
                 const hasMass = church.misek && church.misek.length > 0;
-                
+
                 const churchItemDiv = document.createElement('div');
                 churchItemDiv.className = 'col-md-6 mb-1';
-                
+
                 const checkboxLabel = document.createElement('label');
                 checkboxLabel.className = 'form-check';
-                
+
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.className = 'form-check-input church-checkbox';
@@ -322,9 +381,9 @@
                 // Alapból csak a miséket tartalmazó templomokat jelöljük be
                 checkbox.checked = hasMass;
                 checkbox.dataset.hasMass = hasMass ? 'true' : 'false';
-                
+
                 // Külön eseménykezelő minden templom jelölőnégyzetéhez
-                checkbox.addEventListener('change', function() {
+                checkbox.addEventListener('change', function () {
                     if (this.checked) {
                         visibleChurchIds.add(this.value);
                     } else {
@@ -333,24 +392,24 @@
                     updateChurchMarkers();
                     fitMapToVisibleChurches();
                 });
-                
+
                 const labelText = document.createElement('span');
                 labelText.textContent = `${church.nev || 'Ismeretlen templom'} ${!hasMass ? '(nincs mise)' : ''}`;
-                
+
                 checkboxLabel.appendChild(checkbox);
                 checkboxLabel.appendChild(labelText);
                 churchItemDiv.appendChild(checkboxLabel);
                 churchListElement.appendChild(churchItemDiv);
             });
         }
-        
+
         // Mise nélküli templomok kezelése
-        document.getElementById('hide-no-mass').addEventListener('change', function() {
+        document.getElementById('hide-no-mass').addEventListener('change', function () {
             const hideNoMass = this.checked;
-            
+
             document.querySelectorAll('.church-checkbox').forEach(checkbox => {
                 const hasMass = checkbox.dataset.hasMass === 'true';
-                
+
                 // Ha elrejtjük a mise nélküli templomokat és ennek nincs miséje
                 if (hideNoMass && !hasMass) {
                     checkbox.checked = false;
@@ -361,58 +420,59 @@
                     // Ne állítsuk vissza automatikusan, csak tegyük engedélyezetté
                 }
             });
-            
+
             updateChurchMarkers();
         });
-        
+
         // "Összes kijelölése" gomb kezelése
-        document.getElementById('select-all-btn').addEventListener('click', function() {
+        document.getElementById('select-all-btn').addEventListener('click', function () {
             document.querySelectorAll('.church-checkbox:not(:disabled)').forEach(checkbox => {
                 checkbox.checked = true;
                 visibleChurchIds.add(checkbox.value);
             });
             updateChurchMarkers();
         });
-        
+
         // "Kijelölések törlése" gomb kezelése
-        document.getElementById('deselect-all-btn').addEventListener('click', function() {
+        document.getElementById('deselect-all-btn').addEventListener('click', function () {
             document.querySelectorAll('.church-checkbox:not(:disabled)').forEach(checkbox => {
                 checkbox.checked = false;
                 visibleChurchIds.delete(checkbox.value);
             });
             updateChurchMarkers();
         });
-        
-        
+
+
         // Eseménykezelő a keresés gombhoz
-        document.getElementById('search-btn').addEventListener('click', async function() {
+        document.getElementById('search-btn').addEventListener('click', async function () {
             const settlement = document.getElementById('settlement').value;
             const distance = document.getElementById('distance').value;
             const massDate = document.getElementById('mass-date').value;
             const customDate = document.getElementById('custom-date').value;
             const churchLimit = document.getElementById('church-limit').value;
-            
+
             if (settlement) {
                 try {
                     // Betöltés jelzése
                     document.getElementById('loading').style.display = 'block';
-                    
+
                     // Település koordinátáinak lekérése
                     const locationResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(settlement)},Hungary`);
                     const locationData = await locationResponse.json();
-                    
+
                     if (locationData && locationData.length > 0) {
                         const lat = parseFloat(locationData[0].lat);
                         const lon = parseFloat(locationData[0].lon);
-                        
+
                         // Térkép középpontjának áthelyezése
                         map.setView([lat, lon], 12);
-                        
+
                         let churches = [];
-                        
+                        document.getElementById('eloestileiras').style.display = 'none';
+
                         // Vasárnapi misék előestével opció kezelése
                         const includeSaturdayEvening = document.getElementById('include-saturday-evening').checked;
-                        
+
                         // Mise időpontjának beállítása a kiválasztott értékre
                         let whenMass = 'sunday';
                         if (massDate === 'custom' && customDate) {
@@ -420,20 +480,19 @@
                         } else {
                             whenMass = massDate;
                         }
-                        
+
                         // Templomok lekérése a miserend.hu API-tól
                         churches = await getChurches(lat, lon, distance, whenMass, parseInt(churchLimit));
-                        
+
                         // Ha vasárnap + előesti, akkor szombati misék is kellenek
                         if (massDate === 'sunday' && includeSaturdayEvening) {
                             // Lekérjük a szombati miséket is
                             const saturdayChurches = await getChurches(lat, lon, distance, 'saturday', parseInt(churchLimit));
-                            
                             // Az összes templom listához hozzáadjuk azokat a templomokat és miséket, amik még nem szerepelnek benne
                             saturdayChurches.forEach(saturdayChurch => {
                                 // Keressük a templomot a vasárnapi listában
                                 const existingChurchIndex = churches.findIndex(c => c.id === saturdayChurch.id);
-                                
+
                                 if (existingChurchIndex !== -1) {
                                     // A templom már szerepel, csak az előesti miséket adjuk hozzá
                                     if (saturdayChurch.misek && saturdayChurch.misek.length > 0) {
@@ -449,15 +508,16 @@
                                             }
                                             return false;
                                         });
-                                        
+
                                         // Jelöljük az előesti miséket "ee: hh:mm" formátumban (kettőspont nélkül)
                                         eveningMasses.forEach(mass => {
                                             // Időpont formátuma: "2025-05-17 17:30:00"
                                             let idopontSzoveg = mass.idopont || '';
                                             idopontSzoveg = "ee: " + idopontSzoveg.split(' ')[1].split(':').slice(0, 2).join(':');
                                             mass.idopont = idopontSzoveg;
+                                            document.getElementById('eloestileiras').style.display = 'block';
                                         });
-                                        
+
                                         // Hozzáadjuk a szűrt előesti miséket a vasárnapi misékhez
                                         churches[existingChurchIndex].misek = [
                                             ...churches[existingChurchIndex].misek,
@@ -479,7 +539,7 @@
                                             }
                                             return false;
                                         });
-                                        
+
                                         // Jelöljük az előesti miséket "ee" prefixszel
                                         saturdayChurch.misek.forEach(mass => {
                                             // Időpont formátuma: "2025-05-17 17:30:00"
@@ -487,18 +547,30 @@
                                             // Módosítjuk az időpontot, hogy tartalmazzon ee jelzést (kettőspont nélkül)
                                             mass.idopont = idopontSzoveg.split(' ')[1].split(':').slice(0, 2).join(':');
                                         });
-                                        
+
                                         // Ha van előesti mise, hozzáadjuk a templomot a listához
                                         if (saturdayChurch.misek.length > 0) {
                                             churches.push(saturdayChurch);
+                                            document.getElementById('eloestileiras').style.display = 'block';
                                         }
                                     }
                                 }
                             });
                         }
-                        
+
                         // Templomok megjelenítése a térképen
                         displayChurches(churches);
+                        let massTime = document.getElementById('mass-date').options[document.getElementById('mass-date').selectedIndex].text;
+                        if (massTime == "Egyedi dátum...") {
+                            massTime = customDate.replaceAll('-', '.');
+                        } else if (massTime == "Ma") {
+                            const today = new Date();
+                            const year = today.getFullYear();
+                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                            const day = String(today.getDate()).padStart(2, '0');
+                            massTime = `${year}-${month}-${day}`;
+                        }
+                        document.getElementById('varosNap').innerText = `${settlement} - ${massTime}`;
                     } else {
                         alert('A település nem található!');
                     }
@@ -513,21 +585,21 @@
                 alert('Kérem adja meg a település nevét!');
             }
         });
-        
+
         // Markerek frissítése a láthatóság alapján
         function updateChurchMarkers() {
             // Korábbi markerek törlése
             churchMarkers.clearLayers();
-            
+
             // Meglévő miserend konténerek eltávolítása
             document.querySelectorAll('.mass-schedule-container').forEach(el => el.remove());
-            
+
             console.log("Látható templomok száma:", visibleChurchIds.size);
-            
+
             // Csak a látható templomok markereinek és miserendjeinek hozzáadása
             const showMassSchedule = document.getElementById('show-mass-schedule').checked;
             const visibleChurches = [];
-            
+
             // Először összegyűjtjük a látható templomokat
             allChurches.forEach(church => {
                 const churchIdStr = (church.id || "").toString();
@@ -535,109 +607,109 @@
                     visibleChurches.push(church);
                 }
             });
-            
+
             // Meghatározzuk a határpont templomokat (legészakibb, legdélibb, legkeletibb, legnyugatibb)
             const extremeChurches = findExtremeChurches(visibleChurches);
-            
+
             // Hozzáadjuk a markereket a térképhez
             visibleChurches.forEach(church => {
-                const marker = L.marker([church.lat, church.lon], {icon: churchIcon});
-                
+                const marker = L.marker([church.lat, church.lon], { icon: churchIcon });
+
                 churchMarkers.addLayer(marker);
             });
-            
+
             // Ha engedélyezve van a miserend megjelenítése, akkor hozzáadjuk a miserendeket
             if (showMassSchedule) {
                 // Miserendek pozicionálása az átfedések elkerülésével
                 positionMassSchedules(visibleChurches);
             }
         }
-        
+
         // Megtalálja a legészakibb, legdélibb, legkeletibb és legnyugatibb templomokat
         function findExtremeChurches(churches) {
             if (!churches || churches.length === 0) {
                 return [null, null, null, null];
             }
-            
+
             let northmost = churches[0];
             let southmost = churches[0];
             let eastmost = churches[0];
             let westmost = churches[0];
-            
+
             churches.forEach(church => {
                 // Legészakibb (legnagyobb szélesség)
                 if (church.lat > northmost.lat) {
                     northmost = church;
                 }
-                
+
                 // Legdélibb (legkisebb szélesség)
                 if (church.lat < southmost.lat) {
                     southmost = church;
                 }
-                
+
                 // Legkeletibb (legnagyobb hosszúság)
                 if (church.lon > eastmost.lon) {
                     eastmost = church;
                 }
-                
+
                 // Legnyugatibb (legkisebb hosszúság)
                 if (church.lon < westmost.lon) {
                     westmost = church;
                 }
             });
-            
+
             return [northmost, southmost, eastmost, westmost];
         }
-        
+
         // Miserendek pozicionálása a térképen az átfedések elkerülésével
         function positionMassSchedules(churches) {
             // Átfedések elkerüléséhez használt téglalap adatok
             const usedRectangles = [];
-            
+
             churches.forEach(church => {
                 // Csak azokhoz a templomokhoz jelenítünk meg miserendet, amelyeknek van miséjük
                 if (church.misek && church.misek.length > 0 && church.lat && church.lon) {
-                    
-                    
+
+
                     // Létrehozzuk a miserend konténert
                     const scheduleContainer = document.createElement('div');
                     scheduleContainer.className = 'mass-schedule-container';
                     scheduleContainer.id = `mass-schedule-${church.id}`;
-                    
+
                     // Miserend tartalom létrehozása
                     let scheduleContent = `<strong>${church.nev || 'Templom'}</strong><br/>`;
-                                        
-                        scheduleContent += church.misek.map(mass => {
-                            const idopontSzoveg = mass.idopont || '';
-                            // Csak az időt jelenítjük meg (év-hó-nap után)
-                            const timeOnly = idopontSzoveg.replace(/^\d{4}-\d{2}-\d{2}\s+/, '');
-                            // Másodpercek eltávolítása az időpontból (pl. 07:30:00 -> 07:30)
-                            if (timeOnly.includes('ee:')) {
-                                // Előesti mise formátum
-                                return timeOnly.replace(/:\d{3}$/, '');
-                            }
-                            const timeWithoutSeconds = timeOnly.replace(/:\d{2}$/, '');
-                            return timeWithoutSeconds;
-                        }).join(', ');
-                    
+
+                    scheduleContent += church.misek.map(mass => {
+                        const idopontSzoveg = mass.idopont || '';
+                        // Csak az időt jelenítjük meg (év-hó-nap után)
+                        const timeOnly = idopontSzoveg.replace(/^\d{4}-\d{2}-\d{2}\s+/, '');
+                        // Másodpercek eltávolítása az időpontból (pl. 07:30:00 -> 07:30)
+                        if (timeOnly.includes('ee:')) {
+                            // Előesti mise formátum
+                            return timeOnly.replace(/:\d{3}$/, '');
+                        }
+                        const timeWithoutSeconds = timeOnly.replace(/:\d{2}$/, '');
+                        return timeWithoutSeconds;
+                    }).join(', ');
+
 
                     scheduleContainer.innerHTML = scheduleContent;
-                    
+
                     // Hozzáadjuk a DOM-hoz, hogy méretét megkapjuk
                     document.body.appendChild(scheduleContainer);
-                    
+
                     // Miserend pozíciójának kiszámítása a térképen
                     const latlng = L.latLng(church.lat, church.lon);
                     const point = map.latLngToContainerPoint(latlng);
-                    
+
                     // Alapértelmezett pozíció (a marker-től jobbra)
                     let posX = point.x + 20;
                     let posY = point.y - scheduleContainer.offsetHeight / 2;
-                    
+
                     // Konténer méretei
                     const width = scheduleContainer.offsetWidth;
                     const height = scheduleContainer.offsetHeight;
-                    
+
                     // Jelenlegi téglalap definiálása
                     let currentRect = {
                         x: posX,
@@ -645,12 +717,12 @@
                         width: width,
                         height: height
                     };
-                    
+
                     // Ellenőrizzük az átfedéseket és módosítjuk a pozíciót, ha szükséges
                     let overlap = true;
                     let attempts = 0;
                     const maxAttempts = 8; // Maximális próbálkozások száma
-                    
+
                     // Lehetséges pozíciók (óramutató járásával megegyező irányban)
                     const positions = [
                         { x: point.x + 20, y: point.y - height / 2 },  // jobb
@@ -662,14 +734,14 @@
                         { x: point.x - width / 2, y: point.y + 10 }, // alsó
                         { x: point.x + 20, y: point.y + 10 } // jobb-alsó
                     ];
-                    
+
                     while (overlap && attempts < maxAttempts) {
                         overlap = false;
-                        
+
                         // Új pozíció az aktuális próbálkozás alapján
                         currentRect.x = positions[attempts].x;
                         currentRect.y = positions[attempts].y;
-                        
+
                         // Ellenőrizzük, hogy átfed-e meglévő téglalapokat
                         for (const rect of usedRectangles) {
                             if (
@@ -682,51 +754,51 @@
                                 break;
                             }
                         }
-                        
+
                         attempts++;
                     }
-                    
+
                     // Beállítjuk a végső pozíciót
                     posX = currentRect.x;
                     posY = currentRect.y;
-                    
+
                     // Megjegyezzük a használt téglalapot
                     usedRectangles.push(currentRect);
-                    
+
                     // Pozícionáljuk a konténert
                     scheduleContainer.style.left = `${posX}px`;
                     scheduleContainer.style.top = `${posY}px`;
-                    
+
                     // Térképhez kapcsoljuk a miserend konténert
                     const mapContainer = document.getElementById('map');
                     mapContainer.appendChild(scheduleContainer);
                 }
             });
         }
-        
+
         // "Miserend megjelenítése a térképen" jelölőnégyzet kezelése
         document.getElementById('show-mass-schedule').addEventListener('change', updateChurchMarkers);
-        
+
         // Térkép eseménykezelők a miserend frissítéséhez
-        map.on('moveend', function() {
+        map.on('moveend', function () {
             if (document.getElementById('show-mass-schedule').checked) {
                 // Csak akkor frissítjük a miserendeket, ha láthatóak
                 updateMassSchedules();
             }
         });
-        
-        map.on('zoomend', function() {
+
+        map.on('zoomend', function () {
             if (document.getElementById('show-mass-schedule').checked) {
                 // Csak akkor frissítjük a miserendeket, ha láthatóak
                 updateMassSchedules();
             }
         });
-        
+
         // Frissíti csak a miserendek pozícióját, a markereket nem érinti
         function updateMassSchedules() {
             // Meglévő miserend konténerek eltávolítása
             document.querySelectorAll('.mass-schedule-container').forEach(el => el.remove());
-            
+
             // Látható templomok összegyűjtése
             const visibleChurches = [];
             allChurches.forEach(church => {
@@ -735,16 +807,16 @@
                     visibleChurches.push(church);
                 }
             });
-            
+
             // Miserendek újrapozicionálása
             positionMassSchedules(visibleChurches);
         }
-        
+
         // Eseménykezelő a dátum kiválasztó típusának változtatásához
-        document.getElementById('mass-date').addEventListener('change', function() {
+        document.getElementById('mass-date').addEventListener('change', function () {
             const customDateInput = document.getElementById('custom-date');
             const saturdayEveningContainer = document.getElementById('saturday-evening-container');
-            
+
             if (this.value === 'custom') {
                 customDateInput.style.display = 'block';
                 // Állítsuk be az aktuális dátumot alapértelmezettként
@@ -760,13 +832,14 @@
                 saturdayEveningContainer.style.display = this.value === 'sunday' ? 'block' : 'none';
             }
         });
-        
+
         // Inicializáljuk az előesti mise checkbox megjelenítését a kezdeti állapot alapján
-        window.addEventListener('DOMContentLoaded', function() {
+        window.addEventListener('DOMContentLoaded', function () {
             const massDateSelect = document.getElementById('mass-date');
             const saturdayEveningContainer = document.getElementById('saturday-evening-container');
             saturdayEveningContainer.style.display = massDateSelect.value === 'sunday' ? 'block' : 'none';
         });
     </script>
 </body>
+
 </html>
