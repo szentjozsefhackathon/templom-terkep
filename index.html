@@ -101,6 +101,12 @@
                                         </select>
                                         <input type="date" class="form-control" id="custom-date" style="display: none;">
                                     </div>
+                                    <div class="form-check mt-2" id="saturday-evening-container" style="display: none;">
+                                        <input class="form-check-input" type="checkbox" id="include-saturday-evening" checked>
+                                        <label class="form-check-label" for="include-saturday-evening">
+                                            Előesti mise is (szombat 17:00 után)
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-3">
@@ -325,6 +331,7 @@
                         visibleChurchIds.delete(this.value);
                     }
                     updateChurchMarkers();
+                    fitMapToVisibleChurches();
                 });
                 
                 const labelText = document.createElement('span');
@@ -376,71 +383,6 @@
             updateChurchMarkers();
         });
         
-        // Templom popup HTML létrehozása
-        function createChurchPopup(church) {
-            let popupContent = `
-                <div class="church-popup">
-                    <h5>${church.nev || 'Ismeretlen templom'}</h5>
-                    <div><strong>Cím:</strong> ${church.cim || 'Nincs megadva'}</div>
-            `;
-            
-            if (church.misek && church.misek.length > 0) {
-                // Ellenőrzöm, hogy minden mise ugyanazon a napon van-e
-                const datePattern = /^\d{4}-\d{2}-\d{2}/;
-                const miseDates = church.misek.map(mass => {
-                    const matches = mass.idopont.match(datePattern);
-                    return matches ? matches[0] : '';
-                });
-                const uniqueDates = new Set(miseDates);
-                const egyNap = uniqueDates.size === 1;
-                
-                if (egyNap) {
-                    // Ha minden mise ugyanazon a napon van, csak az időpontokat jelenítjük meg
-                    popupContent += `<div class="church-info"><strong>Misék:</strong><ul>`;
-                    church.misek.forEach(mass => {
-                        const idopontSzoveg = mass.idopont || '';
-                        // Csak az időt jelenítjük meg (év-hó-nap után)
-                        const timeOnly = idopontSzoveg.replace(/^\d{4}-\d{2}-\d{2}\s+/, '');
-                        // Másodpercek eltávolítása az időpontból (pl. 07:30:00 -> 07:30)
-                        const timeWithoutSeconds = timeOnly.replace(/:\d{2}$/, '');
-                        popupContent += `<li>${timeWithoutSeconds}</li>`;
-                    });
-                } else {
-                    // Ha különböző napokon vannak a misék, a napot és időt is megjelenítjük
-                    popupContent += `<div class="church-info"><strong>Misék:</strong><ul>`;
-                    church.misek.forEach(mass => {
-                        const idopontSzoveg = mass.idopont || '';
-                        // Elválasztjuk a dátumot és az időt
-                        const dateTimeMatch = idopontSzoveg.match(/^(\d{4}-\d{2}-\d{2})\s+(.+)/);
-                        if (dateTimeMatch) {
-                            // A másodpercek eltávolítása az időpontból
-                            const timeWithoutSeconds = dateTimeMatch[2].replace(/:\d{2}$/, '');
-                            popupContent += `<li>${dateTimeMatch[1]} ${timeWithoutSeconds}</li>`;
-                        } else {
-                            const withoutSeconds = idopontSzoveg.replace(/:\d{2}$/, '');
-                            popupContent += `<li>${withoutSeconds}</li>`;
-                        }
-                    });
-                }
-                
-                popupContent += `</ul></div>`;
-            } else {
-                popupContent += `<div class="church-info">Nincs miserend információ</div>`;
-            }
-            
-            if (church.honlap) {
-                popupContent += `<div class="church-info"><a href="${church.honlap}" target="_blank">Weboldal</a></div>`;
-            }
-            
-            // Távolság megjelenítése
-            if (church.tavolsag) {
-                const distanceKm = (church.tavolsag / 1000).toFixed(1);
-                popupContent += `<div class="church-info"><strong>Távolság:</strong> ${distanceKm} km</div>`;
-            }
-            
-            popupContent += `</div>`;
-            return popupContent;
-        }
         
         // Eseménykezelő a keresés gombhoz
         document.getElementById('search-btn').addEventListener('click', async function() {
@@ -466,6 +408,11 @@
                         // Térkép középpontjának áthelyezése
                         map.setView([lat, lon], 12);
                         
+                        let churches = [];
+                        
+                        // Vasárnapi misék előestével opció kezelése
+                        const includeSaturdayEvening = document.getElementById('include-saturday-evening').checked;
+                        
                         // Mise időpontjának beállítása a kiválasztott értékre
                         let whenMass = 'sunday';
                         if (massDate === 'custom' && customDate) {
@@ -475,7 +422,80 @@
                         }
                         
                         // Templomok lekérése a miserend.hu API-tól
-                        const churches = await getChurches(lat, lon, distance, whenMass, parseInt(churchLimit));
+                        churches = await getChurches(lat, lon, distance, whenMass, parseInt(churchLimit));
+                        
+                        // Ha vasárnap + előesti, akkor szombati misék is kellenek
+                        if (massDate === 'sunday' && includeSaturdayEvening) {
+                            // Lekérjük a szombati miséket is
+                            const saturdayChurches = await getChurches(lat, lon, distance, 'saturday', parseInt(churchLimit));
+                            
+                            // Az összes templom listához hozzáadjuk azokat a templomokat és miséket, amik még nem szerepelnek benne
+                            saturdayChurches.forEach(saturdayChurch => {
+                                // Keressük a templomot a vasárnapi listában
+                                const existingChurchIndex = churches.findIndex(c => c.id === saturdayChurch.id);
+                                
+                                if (existingChurchIndex !== -1) {
+                                    // A templom már szerepel, csak az előesti miséket adjuk hozzá
+                                    if (saturdayChurch.misek && saturdayChurch.misek.length > 0) {
+                                        // Szűrjük az előesti miséket (17:00 utániak)
+                                        const eveningMasses = saturdayChurch.misek.filter(mass => {
+                                            const idopontSzoveg = mass.idopont || '';
+                                            // Időpont formátuma: "2025-05-17 17:30:00"
+                                            const timeMatch = idopontSzoveg.match(/\d{2}:\d{2}:\d{2}$/);
+                                            if (timeMatch) {
+                                                const time = timeMatch[0];
+                                                // Ellenőrizzük, hogy 17:00 utáni-e
+                                                return time >= "17:00:00";
+                                            }
+                                            return false;
+                                        });
+                                        
+                                        // Jelöljük az előesti miséket "ee: hh:mm" formátumban (kettőspont nélkül)
+                                        eveningMasses.forEach(mass => {
+                                            // Időpont formátuma: "2025-05-17 17:30:00"
+                                            let idopontSzoveg = mass.idopont || '';
+                                            idopontSzoveg = "ee: " + idopontSzoveg.split(' ')[1].split(':').slice(0, 2).join(':');
+                                            mass.idopont = idopontSzoveg;
+                                        });
+                                        
+                                        // Hozzáadjuk a szűrt előesti miséket a vasárnapi misékhez
+                                        churches[existingChurchIndex].misek = [
+                                            ...churches[existingChurchIndex].misek,
+                                            ...eveningMasses
+                                        ];
+                                    }
+                                } else {
+                                    // A templom még nem szerepel, de csak akkor adjuk hozzá, ha van előesti miséje
+                                    if (saturdayChurch.misek && saturdayChurch.misek.length > 0) {
+                                        // Szűrjük az előesti miséket (17:00 utániak)
+                                        saturdayChurch.misek = saturdayChurch.misek.filter(mass => {
+                                            const idopontSzoveg = mass.idopont || '';
+                                            // Időpont formátuma: "2025-05-17 17:30:00"
+                                            const timeMatch = idopontSzoveg.match(/\d{2}:\d{2}:\d{2}$/);
+                                            if (timeMatch) {
+                                                const time = timeMatch[0];
+                                                // Ellenőrizzük, hogy 17:00 utáni-e
+                                                return time >= "17:00:00";
+                                            }
+                                            return false;
+                                        });
+                                        
+                                        // Jelöljük az előesti miséket "ee" prefixszel
+                                        saturdayChurch.misek.forEach(mass => {
+                                            // Időpont formátuma: "2025-05-17 17:30:00"
+                                            const idopontSzoveg = mass.idopont || '';
+                                            // Módosítjuk az időpontot, hogy tartalmazzon ee jelzést (kettőspont nélkül)
+                                            mass.idopont = idopontSzoveg.split(' ')[1].split(':').slice(0, 2).join(':');
+                                        });
+                                        
+                                        // Ha van előesti mise, hozzáadjuk a templomot a listához
+                                        if (saturdayChurch.misek.length > 0) {
+                                            churches.push(saturdayChurch);
+                                        }
+                                    }
+                                }
+                            });
+                        }
                         
                         // Templomok megjelenítése a térképen
                         displayChurches(churches);
@@ -521,22 +541,7 @@
             
             // Hozzáadjuk a markereket a térképhez
             visibleChurches.forEach(church => {
-                const marker = L.marker([church.lat, church.lon], {icon: churchIcon})
-                    .bindPopup(createChurchPopup(church));
-                
-                // Ellenőrizzük, hogy ez egy határpont templom-e
-                const isExtreme = extremeChurches.some(extremeChurch => 
-                    extremeChurch && extremeChurch.id === church.id);
-                
-                // Ha határpont templom, akkor állandó feliratot adunk hozzá
-                if (isExtreme) {
-                    marker.bindTooltip(church.nev || 'Templom', {
-                        permanent: true,
-                        direction: 'top',
-                        className: 'church-label',
-                        offset: [0, -35]
-                    });
-                }
+                const marker = L.marker([church.lat, church.lon], {icon: churchIcon});
                 
                 churchMarkers.addLayer(marker);
             });
@@ -592,14 +597,7 @@
             churches.forEach(church => {
                 // Csak azokhoz a templomokhoz jelenítünk meg miserendet, amelyeknek van miséjük
                 if (church.misek && church.misek.length > 0 && church.lat && church.lon) {
-                    // Ellenőrzöm, hogy minden mise ugyanazon a napon van-e
-                    const datePattern = /^\d{4}-\d{2}-\d{2}/;
-                    const miseDates = church.misek.map(mass => {
-                        const matches = mass.idopont.match(datePattern);
-                        return matches ? matches[0] : '';
-                    });
-                    const uniqueDates = new Set(miseDates);
-                    const egyNap = uniqueDates.size === 1;
+                    
                     
                     // Létrehozzuk a miserend konténert
                     const scheduleContainer = document.createElement('div');
@@ -609,35 +607,20 @@
                     // Miserend tartalom létrehozása
                     let scheduleContent = `<strong>${church.nev || 'Templom'}</strong><br/>`;
                                         
-                    if (egyNap) {
-                        // Ha minden mise ugyanazon a napon van, csak az időt jelenítjük meg
                         scheduleContent += church.misek.map(mass => {
                             const idopontSzoveg = mass.idopont || '';
                             // Csak az időt jelenítjük meg (év-hó-nap után)
                             const timeOnly = idopontSzoveg.replace(/^\d{4}-\d{2}-\d{2}\s+/, '');
                             // Másodpercek eltávolítása az időpontból (pl. 07:30:00 -> 07:30)
+                            if (timeOnly.includes('ee:')) {
+                                // Előesti mise formátum
+                                return timeOnly.replace(/:\d{3}$/, '');
+                            }
                             const timeWithoutSeconds = timeOnly.replace(/:\d{2}$/, '');
                             return timeWithoutSeconds;
                         }).join(', ');
-                    } else {
-                        // Ha különböző napokon vannak a misék, a dátumot és időt is megjelenítjük
-                        for (let i = 0; i < church.misek.length; i++) {
-                            const idopontSzoveg = church.misek[i].idopont || '';
-                            // Elválasztjuk a dátumot és az időt
-                            const dateTimeMatch = idopontSzoveg.match(/^(\d{4}-\d{2}-\d{2})\s+(.+)/);
-                            if (dateTimeMatch) {
-                                // A másodpercek eltávolítása az időpontból
-                                const timeWithoutSeconds = dateTimeMatch[2].replace(/:\d{2}$/, '');
-                                scheduleContent += `<li>${timeWithoutSeconds}</li>`;
-                            } else {
-                                const withoutSeconds = idopontSzoveg.replace(/:\d{2}$/, '');
-                                scheduleContent += `<li>${withoutSeconds}</li>`;
-                            }
-                        }
-                    }
                     
 
-                    scheduleContent += '</ul>';
                     scheduleContainer.innerHTML = scheduleContent;
                     
                     // Hozzáadjuk a DOM-hoz, hogy méretét megkapjuk
@@ -760,6 +743,8 @@
         // Eseménykezelő a dátum kiválasztó típusának változtatásához
         document.getElementById('mass-date').addEventListener('change', function() {
             const customDateInput = document.getElementById('custom-date');
+            const saturdayEveningContainer = document.getElementById('saturday-evening-container');
+            
             if (this.value === 'custom') {
                 customDateInput.style.display = 'block';
                 // Állítsuk be az aktuális dátumot alapértelmezettként
@@ -768,9 +753,19 @@
                 const month = String(today.getMonth() + 1).padStart(2, '0');
                 const day = String(today.getDate()).padStart(2, '0');
                 customDateInput.value = `${year}-${month}-${day}`;
+                saturdayEveningContainer.style.display = 'none';
             } else {
                 customDateInput.style.display = 'none';
+                // Ha vasárnap van kiválasztva, mutassuk az előesti mise opciót
+                saturdayEveningContainer.style.display = this.value === 'sunday' ? 'block' : 'none';
             }
+        });
+        
+        // Inicializáljuk az előesti mise checkbox megjelenítését a kezdeti állapot alapján
+        window.addEventListener('DOMContentLoaded', function() {
+            const massDateSelect = document.getElementById('mass-date');
+            const saturdayEveningContainer = document.getElementById('saturday-evening-container');
+            saturdayEveningContainer.style.display = massDateSelect.value === 'sunday' ? 'block' : 'none';
         });
     </script>
 </body>
