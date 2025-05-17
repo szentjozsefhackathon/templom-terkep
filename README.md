@@ -3,8 +3,9 @@ Templomok térképe egy adott városban. Később miserenddel is. :)
 
 ## Használat
 
-- Telepítés: `pip install -r /path/to/requirements.txt`
-- Indítás: `python3 templom-terkep.py`
+- Poetry telepítés: `pip install poetry`
+- Függőség telepítés: `poetry install`
+- Indítás: `poetry run python templom-terkep.py`
 
 ## Kapcsolók
 
