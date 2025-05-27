@@ -1,6 +1,8 @@
 # templom-terkep
 Templomok térképe egy adott városban. Később miserenddel is. :)
 
+Honlap: https://szentjozsefhackathon.github.io/templom-terkep
+
 ## Használat
 
 - Poetry telepítés: `pip install poetry`

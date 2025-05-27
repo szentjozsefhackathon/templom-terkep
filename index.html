@@ -98,8 +98,14 @@
 
 <body>
     <div class="container">
-        <h1 class="text-center mb-4">Templom Térkép</h1>
-
+        <h1 class="text-center mb-4">Templom Térkép készítő</h1>
+        <div class="alert alert-info alert-dismissible fade show text-center" role="alert">
+            <p></p>Nyomtatásra előkészített képet készíthetünk itt katolikus templomokból és azok miserendjéből. Az elkészült posztert a térkép bal felső részént található letöltés gombra kattintva lehet többféle méretben letölteni.</p>
+            <p>Ez az oldal a <a href="https://szentjozsef.jezsuita.hu/szent-jozsef-hackathon/" target="_blank">Szent József Hackathon</a>, azaz keresztény programozói hétvége keretében készült.</p>
+            Ha hibát talál, vagy javaslata van, <a href="https://github.com/szentjozsefhackathon/templom-terkep/issues" target="_blank" class="alert-link">itt küldheti el nekünk</a>.
+            
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Bezárás"></button>
+        </div>
         <div class="row mb-4">
             <div class="col-md-12">
                 <div class="card">
@@ -114,7 +120,7 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="distance" class="form-label">Távolság (km):</label>
+                                    <label for="distance" class="form-label">Távolság a középpontól (km):</label>
                                     <input type="number" class="form-control" id="distance" placeholder="Távolság"
                                         min="1" max="100" value="10">
                                 </div>
