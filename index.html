@@ -1100,45 +1100,29 @@
                 // Capture only the cards grid, not the section header (which contains the button and h3)
                 const cardsEl = document.getElementById('church-cards');
 
-                // Convert card images to data URLs for html2canvas.
-                // Uses an offscreen Image with crossOrigin='anonymous' and a cache-busting param
-                // to force a fresh CORS-capable request, bypassing any cached non-CORS responses.
+                // Convert card images to same-origin blob URLs so html2canvas can draw them
+                // without any CORS restriction.
+                // fetch() with cache:'no-store' forces a fresh network request using the ORIGINAL
+                // URL (no query-param modification that could cause 404s), bypassing any cached
+                // non-CORS response the browser may have stored from earlier <img> loads.
                 const imgs = Array.from(cardsEl.querySelectorAll('img'));
                 const origSrcs = imgs.map(img => img.src);
-                const cacheBust = Date.now();
+                const blobUrls = new Array(imgs.length).fill(null);
                 await Promise.all(imgs.map(async (img, i) => {
-                    const dataUrl = await new Promise(resolve => {
-                        const corsImg = new Image();
-                        corsImg.crossOrigin = 'anonymous';
-                        // Cache-bust to avoid the browser serving a cached non-CORS response.
-                        // Include index to guarantee a unique URL even when all images are
-                        // processed within the same millisecond.
-                        const sep = origSrcs[i].includes('?') ? '&' : '?';
-                        corsImg.src = origSrcs[i] + sep + '_cb=' + cacheBust + '_' + i;
-                        corsImg.onload = function () {
-                            try {
-                                const c = document.createElement('canvas');
-                                c.width = this.naturalWidth;
-                                c.height = this.naturalHeight;
-                                c.getContext('2d').drawImage(this, 0, 0);
-                                resolve(c.toDataURL());
-                            } catch (e) {
-                                console.warn('Canvas draw failed for', origSrcs[i], e);
-                                resolve(null);
-                            }
-                        };
-                        corsImg.onerror = () => {
-                            console.warn('CORS image load failed:', origSrcs[i]);
-                            resolve(null);
-                        };
-                    });
-                    if (dataUrl) img.src = dataUrl;
-                    // If null, img.src stays as original; html2canvas will leave it blank (no taint)
+                    try {
+                        const resp = await fetch(origSrcs[i], { mode: 'cors', cache: 'no-store' });
+                        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                        const blob = await resp.blob();
+                        blobUrls[i] = URL.createObjectURL(blob);
+                        img.src = blobUrls[i];
+                    } catch (err) {
+                        console.warn('Image load failed for export:', origSrcs[i], err);
+                        // img.src stays as original; html2canvas will leave it blank (no taint)
+                    }
                 }));
 
-                // Wait two animation frames so the browser can render the updated data-URL srcs
-                // before html2canvas captures the DOM. Data URLs load synchronously in most
-                // browsers, but requestAnimationFrame gives any pending layout work time to finish.
+                // Wait two animation frames so the browser can paint the updated blob-URL srcs
+                // before html2canvas captures the DOM.
                 await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
                 const opts = {
@@ -1149,13 +1133,18 @@
                     logging: false,
                 };
 
-                const mapCanvas = await html2canvas(mapEl, opts);
-                const cardsCanvas = await html2canvas(cardsEl, opts);
+                // Wrap html2canvas calls in try-finally so blob URLs are always released
+                // even if html2canvas throws an error.
+                let mapCanvas, cardsCanvas;
+                try {
+                    mapCanvas = await html2canvas(mapEl, opts);
+                    cardsCanvas = await html2canvas(cardsEl, opts);
+                } finally {
+                    // Restore original image src values and release blob URLs
+                    imgs.forEach((img, i) => { img.src = origSrcs[i]; });
+                    blobUrls.forEach(url => { if (url) URL.revokeObjectURL(url); });
+                }
 
-                // Restore original image src values
-                imgs.forEach((img, i) => { img.src = origSrcs[i]; });
-
-                // Scale combined content to fit A4 width (height is proportional)
                 const contentW = Math.max(mapCanvas.width, cardsCanvas.width);
                 const availW = A4_W - MARGIN * 2;
                 const scale = availW / contentW;
