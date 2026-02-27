@@ -413,9 +413,6 @@
 
             // Szűrő panel megjelenítése
             document.getElementById('filter-options').style.display = 'block';
-
-            // Templomok kártyáinak frissítése a térkép alatt
-            updateChurchCards();
         }
 
         // Térkép nézet beállítása a látható templomokhoz
@@ -902,7 +899,7 @@
         // Képválasztó modal megnyitása adott templomhoz
         function openPhotoPicker(churchId, photos, cardImgId) {
             const grid = document.getElementById('photo-picker-grid');
-            const modal = bootstrap.Modal.getOrCreate(document.getElementById('photoPickerModal'));
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('photoPickerModal'));
             grid.innerHTML = '';
 
             photos.forEach(url => {
