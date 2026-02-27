@@ -16,6 +16,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script type="text/javascript" src="map-easyPrint/bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
 
     <style>
         #map {
@@ -142,6 +143,11 @@
             right: 8px;
             opacity: 0.9;
         }
+
+        .export-mode .btn-choose-photo,
+        .export-mode .card-footer {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -260,7 +266,10 @@
         </div>
 
         <div id="church-cards-section" style="display: none;">
-            <h3 class="mb-3">Templomok részletesen</h3>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h3 class="mb-0">Templomok részletesen</h3>
+                <button id="download-png-btn" class="btn btn-success btn-sm">📥 Letöltés PNG-be</button>
+            </div>
             <div id="church-cards" class="row">
             </div>
         </div>
@@ -1058,6 +1067,58 @@
 
                 col.appendChild(card);
                 container.appendChild(col);
+            }
+
+            // Download button wire-up (re-attach each time cards are rebuilt)
+            const dlBtn = document.getElementById('download-png-btn');
+            if (dlBtn) {
+                dlBtn.onclick = downloadCombinedPng;
+            }
+        }
+
+        async function downloadCombinedPng() {
+            const btn = document.getElementById('download-png-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Feldolgozás...';
+
+            // Hide elements that should not appear in the export
+            document.body.classList.add('export-mode');
+
+            try {
+                const mapEl = document.getElementById('map');
+                const cardsSection = document.getElementById('church-cards-section');
+
+                const opts = {
+                    useCORS: true,      // required for cross-origin map tile images
+                    allowTaint: false,  // prevent canvas tainting from cross-origin content
+                    scale: 2,
+                    backgroundColor: '#ffffff'
+                };
+
+                const mapCanvas = await html2canvas(mapEl, opts);
+                const cardsCanvas = await html2canvas(cardsSection, opts);
+
+                const totalWidth = Math.max(mapCanvas.width, cardsCanvas.width);
+                const totalHeight = mapCanvas.height + cardsCanvas.height;
+
+                const combined = document.createElement('canvas');
+                combined.width = totalWidth;
+                combined.height = totalHeight;
+                const ctx = combined.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, totalWidth, totalHeight);
+                ctx.drawImage(mapCanvas, 0, 0);
+                ctx.drawImage(cardsCanvas, 0, mapCanvas.height);
+
+                const link = document.createElement('a');
+                const today = new Date().toISOString().slice(0, 10);
+                link.download = `templomTerkep-${today}.png`;
+                link.href = combined.toDataURL('image/png');
+                link.click();
+            } finally {
+                document.body.classList.remove('export-mode');
+                btn.disabled = false;
+                btn.textContent = '📥 Letöltés PNG-be';
             }
         }
 
