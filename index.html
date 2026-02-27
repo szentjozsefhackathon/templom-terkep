@@ -266,9 +266,15 @@
         </div>
 
         <div id="church-cards-section" style="display: none;">
-            <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-3" id="cards-section-header">
                 <h3 class="mb-0">Templomok részletesen</h3>
-                <button id="download-png-btn" class="btn btn-success btn-sm">📥 Letöltés PNG-be</button>
+                <div class="d-flex align-items-center gap-2">
+                    <select id="export-orientation" class="form-select form-select-sm" style="width: auto;" aria-label="Exportálási tájolás">
+                        <option value="landscape">A4 fekvő</option>
+                        <option value="portrait">A4 álló</option>
+                    </select>
+                    <button id="download-png-btn" class="btn btn-success btn-sm">📥 Letöltés PNG-be</button>
+                </div>
             </div>
             <div id="church-cards" class="row">
             </div>
@@ -974,7 +980,7 @@
 
             for (const church of visibleChurches) {
                 const churchId = church.id;
-                const name = church.nev || 'Ismeretlen templom';
+                const name = (church.nev || 'Ismeretlen templom').replace(/\s+/g, ' ').trim();
                 const address = church.helyszin || church.cim || '';
                 const photos = Array.isArray(church.photos)
                     ? church.photos.map(url => url.startsWith('http') ? url : 'https://miserend.hu' + url)
@@ -1078,42 +1084,86 @@
 
         async function downloadCombinedPng() {
             const btn = document.getElementById('download-png-btn');
+            const orientation = document.getElementById('export-orientation').value;
+
+            // A4 canvas dimensions at ~150 DPI (portrait: 210×297mm, landscape: 297×210mm)
+            const A4_W = orientation === 'landscape' ? 1754 : 1240;
+            const A4_H = orientation === 'landscape' ? 1240 : 1754;
+            const MARGIN = 40;
+
             btn.disabled = true;
             btn.textContent = '⏳ Feldolgozás...';
-
-            // Hide elements that should not appear in the export
             document.body.classList.add('export-mode');
 
             try {
                 const mapEl = document.getElementById('map');
-                const cardsSection = document.getElementById('church-cards-section');
+                // Capture only the cards grid, not the section header (which contains the button and h3)
+                const cardsEl = document.getElementById('church-cards');
+
+                // Pre-convert card images to data URLs so html2canvas can render them
+                // (bypasses cross-origin restrictions for images already loaded in <img> tags)
+                const imgs = Array.from(cardsEl.querySelectorAll('img'));
+                const origSrcs = imgs.map(img => img.src);
+                await Promise.all(imgs.map(async (img, i) => {
+                    try {
+                        const resp = await fetch(origSrcs[i], { credentials: 'omit' });
+                        if (!resp.ok) return;
+                        const blob = await resp.blob();
+                        img.src = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch (err) { console.warn('Failed to prefetch image as data URL:', origSrcs[i], err); }
+                }));
+
+                // Brief pause to allow the browser to re-render images whose src was replaced with a data URL
+                await new Promise(r => setTimeout(r, 150));
 
                 const opts = {
-                    useCORS: true,      // required for cross-origin map tile images
-                    allowTaint: false,  // prevent canvas tainting from cross-origin content
+                    useCORS: true,
+                    allowTaint: false,
                     scale: 2,
-                    backgroundColor: '#ffffff'
+                    backgroundColor: '#ffffff',
+                    logging: false,
                 };
 
                 const mapCanvas = await html2canvas(mapEl, opts);
-                const cardsCanvas = await html2canvas(cardsSection, opts);
+                const cardsCanvas = await html2canvas(cardsEl, opts);
 
-                const totalWidth = Math.max(mapCanvas.width, cardsCanvas.width);
-                const totalHeight = mapCanvas.height + cardsCanvas.height;
+                // Restore original image src values
+                imgs.forEach((img, i) => { img.src = origSrcs[i]; });
 
-                const combined = document.createElement('canvas');
-                combined.width = totalWidth;
-                combined.height = totalHeight;
-                const ctx = combined.getContext('2d');
+                // Scale combined content to fit A4 width (height is proportional)
+                const contentW = Math.max(mapCanvas.width, cardsCanvas.width);
+                const availW = A4_W - MARGIN * 2;
+                const scale = availW / contentW;
+
+                const scaledW = Math.round(contentW * scale);
+                const scaledMapH = Math.round(mapCanvas.height * scale);
+                const scaledCardsH = Math.round(cardsCanvas.height * scale);
+                const scaledTotalH = scaledMapH + scaledCardsH;
+
+                // Final canvas: A4 width, height at least A4 height
+                const finalH = Math.max(A4_H, scaledTotalH + MARGIN * 2);
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = A4_W;
+                finalCanvas.height = finalH;
+
+                const ctx = finalCanvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, totalWidth, totalHeight);
-                ctx.drawImage(mapCanvas, 0, 0);
-                ctx.drawImage(cardsCanvas, 0, mapCanvas.height);
+                ctx.fillRect(0, 0, A4_W, finalH);
+
+                // Center content horizontally
+                const offsetX = Math.round((A4_W - scaledW) / 2);
+                ctx.drawImage(mapCanvas, offsetX, MARGIN, scaledW, scaledMapH);
+                ctx.drawImage(cardsCanvas, offsetX, MARGIN + scaledMapH, scaledW, scaledCardsH);
 
                 const link = document.createElement('a');
                 const today = new Date().toISOString().slice(0, 10);
                 link.download = `templomTerkep-${today}.png`;
-                link.href = combined.toDataURL('image/png');
+                link.href = finalCanvas.toDataURL('image/png');
                 link.click();
             } finally {
                 document.body.classList.remove('export-mode');
