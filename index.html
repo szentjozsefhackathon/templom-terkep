@@ -113,6 +113,35 @@
         #church-cards-section {
             margin-top: 30px;
         }
+
+        .photo-thumb {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 3px solid transparent;
+            border-radius: 4px;
+            transition: border-color 0.2s;
+        }
+
+        .photo-thumb:hover {
+            border-color: #0d6efd;
+        }
+
+        .photo-thumb.selected {
+            border-color: #0d6efd;
+        }
+
+        .church-img-wrapper {
+            position: relative;
+        }
+
+        .btn-choose-photo {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            opacity: 0.9;
+        }
     </style>
 </head>
 
@@ -237,6 +266,22 @@
         </div>
     </div>
 
+    <!-- Képválasztó modal -->
+    <div class="modal fade" id="photoPickerModal" tabindex="-1" aria-labelledby="photoPickerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="photoPickerModalLabel">Válasszon képet a templomhoz</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Bezárás"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="photo-picker-grid" class="row g-2">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Térkép inicializálása (Magyarország középpontjával)
         const map = L.map('map').setView([47.162494, 19.503304], 7);
@@ -307,7 +352,8 @@
                         lat: lat,
                         lon: lon,
                         limit: limit,
-                        whenMass: whenMass
+                        whenMass: whenMass,
+                        response_length: 'full'
                     })
                 });
 
@@ -827,8 +873,82 @@
                 .replace(/'/g, '&#039;');
         }
 
+        // Per-templomi felhasználó által kiválasztott képek tárolója
+        const selectedPhotos = {};
+
+        // Egy kép betöltése és méretének lekérdezése
+        function loadImageDimensions(url) {
+            return new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => resolve({ url, width: img.naturalWidth, height: img.naturalHeight });
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
+        }
+
+        // A legjobb (lehetőleg álló) kép kiválasztása a photos tömbből
+        async function pickBestPhoto(photos) {
+            if (!photos || photos.length === 0) return null;
+
+            const results = await Promise.all(photos.map(url => loadImageDimensions(url)));
+            const valid = results.filter(Boolean);
+            if (valid.length === 0) return null;
+
+            // Álló képek: magasság > szélesség
+            const portrait = valid.find(img => img.height > img.width);
+            return portrait ? portrait.url : valid[0].url;
+        }
+
+        // Képválasztó modal megnyitása adott templomhoz
+        function openPhotoPicker(churchId, photos, cardImgId) {
+            const grid = document.getElementById('photo-picker-grid');
+            const modal = bootstrap.Modal.getOrCreate(document.getElementById('photoPickerModal'));
+            grid.innerHTML = '';
+
+            photos.forEach(url => {
+                const col = document.createElement('div');
+                col.className = 'col-4 col-md-3';
+
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = 'photo-thumb' + (selectedPhotos[churchId] === url ? ' selected' : '');
+                img.alt = 'Kép';
+                img.addEventListener('click', () => {
+                    // Főkép frissítése
+                    const cardImg = document.getElementById(cardImgId);
+                    if (cardImg) {
+                        if (cardImg.tagName === 'IMG') {
+                            cardImg.src = url;
+                            cardImg.style.display = '';
+                            const placeholder = cardImg.nextElementSibling;
+                            if (placeholder) placeholder.style.display = 'none';
+                        } else {
+                            // Placeholder div helyett valódi kép elem létrehozása
+                            const newImg = document.createElement('img');
+                            newImg.id = cardImgId;
+                            newImg.src = url;
+                            newImg.className = 'card-img-top church-card-img';
+                            newImg.alt = 'Kép';
+                            cardImg.replaceWith(newImg);
+                        }
+                    }
+                    // Kiválasztott kép mentése
+                    selectedPhotos[churchId] = url;
+                    // Kiemelés frissítése
+                    grid.querySelectorAll('.photo-thumb').forEach(t => t.classList.remove('selected'));
+                    img.classList.add('selected');
+                    modal.hide();
+                });
+
+                col.appendChild(img);
+                grid.appendChild(col);
+            });
+
+            modal.show();
+        }
+
         // Templomok kártyáinak megjelenítése a térkép alatt
-        function updateChurchCards() {
+        async function updateChurchCards() {
             const section = document.getElementById('church-cards-section');
             const container = document.getElementById('church-cards');
 
@@ -846,10 +966,11 @@
             section.style.display = 'block';
             container.innerHTML = '';
 
-            visibleChurches.forEach(church => {
+            for (const church of visibleChurches) {
                 const churchId = church.id;
                 const name = church.nev || 'Ismeretlen templom';
                 const address = church.helyszin || church.cim || '';
+                const photos = Array.isArray(church.photos) ? church.photos : [];
 
                 // Miserend formázása
                 const massSchedule = church.misek && church.misek.length > 0
@@ -865,43 +986,80 @@
                     }).join(', ')
                     : 'Nincs miserend';
 
-                // Kép URL kiszámítása
+                // Kép kiválasztása: felhasználói választás > legjobb álló > első kép
                 const safeName = escapeHtml(name);
-                let imageHtml;
-                if (church.kepek && church.kepek.length > 0) {
-                    const kepUrl = typeof church.kepek[0] === 'string'
-                        ? church.kepek[0]
-                        : (church.kepek[0].url || church.kepek[0].src || '');
-                    imageHtml = kepUrl
-                        ? `<img src="${escapeHtml(kepUrl)}" class="card-img-top church-card-img" alt="${safeName}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                           <div class="church-img-placeholder card-img-top" style="display: none;">⛪</div>`
-                        : `<div class="church-img-placeholder card-img-top">⛪</div>`;
-                } else {
-                    const kepUrl = `https://miserend.hu/img/templomok/${encodeURIComponent(churchId)}/cover.jpg`;
-                    imageHtml = `<img src="${escapeHtml(kepUrl)}" class="card-img-top church-card-img" alt="${safeName}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                 <div class="church-img-placeholder card-img-top" style="display: none;">⛪</div>`;
+                const imgId = `church-img-${churchId}`;
+                let selectedUrl = selectedPhotos[churchId] || null;
+                if (!selectedUrl && photos.length > 0) {
+                    selectedUrl = await pickBestPhoto(photos);
                 }
 
                 const col = document.createElement('div');
                 col.className = 'col-md-4 col-sm-6 mb-4';
-                col.innerHTML = `
-                    <div class="card h-100">
-                        ${imageHtml}
-                        <div class="card-body">
-                            <h5 class="card-title">${safeName}</h5>
-                            ${address ? `<p class="card-text text-muted"><small>📍 ${escapeHtml(address)}</small></p>` : ''}
-                            <p class="card-text">
-                                <strong>Miserend:</strong><br>
-                                <span>${massSchedule}</span>
-                            </p>
-                        </div>
-                        <div class="card-footer">
-                            <a href="https://miserend.hu/temple/${encodeURIComponent(churchId)}" target="_blank" class="btn btn-sm btn-outline-primary">Részletek a miserend.hu-n</a>
-                        </div>
+
+                const card = document.createElement('div');
+                card.className = 'card h-100';
+
+                // Kép wrapper
+                const imgWrapper = document.createElement('div');
+                imgWrapper.className = 'church-img-wrapper';
+
+                if (selectedUrl) {
+                    const img = document.createElement('img');
+                    img.id = imgId;
+                    img.src = selectedUrl;
+                    img.className = 'card-img-top church-card-img';
+                    img.alt = name;
+
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'church-img-placeholder card-img-top';
+                    placeholder.style.display = 'none';
+                    placeholder.textContent = '⛪';
+
+                    img.onerror = function () {
+                        this.style.display = 'none';
+                        placeholder.style.display = 'flex';
+                    };
+
+                    imgWrapper.appendChild(img);
+                    imgWrapper.appendChild(placeholder);
+                } else {
+                    const placeholder = document.createElement('div');
+                    placeholder.id = imgId;
+                    placeholder.className = 'church-img-placeholder card-img-top';
+                    placeholder.textContent = '⛪';
+                    imgWrapper.appendChild(placeholder);
+                }
+
+                // "Kép választása" gomb, ha van egynél több kép
+                if (photos.length > 1) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-sm btn-light btn-choose-photo';
+                    btn.textContent = '🖼 Kép választása';
+                    btn.setAttribute('aria-label', 'Kép választása a templomhoz');
+                    btn.addEventListener('click', () => openPhotoPicker(churchId, photos, imgId));
+                    imgWrapper.appendChild(btn);
+                }
+
+                card.appendChild(imgWrapper);
+
+                card.insertAdjacentHTML('beforeend', `
+                    <div class="card-body">
+                        <h5 class="card-title">${safeName}</h5>
+                        ${address ? `<p class="card-text text-muted"><small>📍 ${escapeHtml(address)}</small></p>` : ''}
+                        <p class="card-text">
+                            <strong>Miserend:</strong><br>
+                            <span>${massSchedule}</span>
+                        </p>
                     </div>
-                `;
+                    <div class="card-footer">
+                        <a href="https://miserend.hu/temple/${encodeURIComponent(churchId)}" target="_blank" class="btn btn-sm btn-outline-primary">Részletek a miserend.hu-n</a>
+                    </div>
+                `);
+
+                col.appendChild(card);
                 container.appendChild(col);
-            });
+            }
         }
 
         // Térkép eseménykezelők a miserend frissítéséhez
