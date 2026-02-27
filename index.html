@@ -970,7 +970,9 @@
                 const churchId = church.id;
                 const name = church.nev || 'Ismeretlen templom';
                 const address = church.helyszin || church.cim || '';
-                const photos = Array.isArray(church.photos) ? church.photos : [];
+                const photos = Array.isArray(church.photos)
+                    ? church.photos.map(url => url.startsWith('http') ? url : 'https://miserend.hu' + url)
+                    : [];
 
                 // Miserend formázása
                 const massSchedule = church.misek && church.misek.length > 0
