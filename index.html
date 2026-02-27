@@ -1100,26 +1100,46 @@
                 // Capture only the cards grid, not the section header (which contains the button and h3)
                 const cardsEl = document.getElementById('church-cards');
 
-                // Pre-convert card images to data URLs so html2canvas can render them
-                // (bypasses cross-origin restrictions for images already loaded in <img> tags)
+                // Convert card images to data URLs for html2canvas.
+                // Uses an offscreen Image with crossOrigin='anonymous' and a cache-busting param
+                // to force a fresh CORS-capable request, bypassing any cached non-CORS responses.
                 const imgs = Array.from(cardsEl.querySelectorAll('img'));
                 const origSrcs = imgs.map(img => img.src);
+                const cacheBust = Date.now();
                 await Promise.all(imgs.map(async (img, i) => {
-                    try {
-                        const resp = await fetch(origSrcs[i], { credentials: 'omit' });
-                        if (!resp.ok) return;
-                        const blob = await resp.blob();
-                        img.src = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(blob);
-                        });
-                    } catch (err) { console.warn('Failed to prefetch image as data URL:', origSrcs[i], err); }
+                    const dataUrl = await new Promise(resolve => {
+                        const corsImg = new Image();
+                        corsImg.crossOrigin = 'anonymous';
+                        // Cache-bust to avoid the browser serving a cached non-CORS response.
+                        // Include index to guarantee a unique URL even when all images are
+                        // processed within the same millisecond.
+                        const sep = origSrcs[i].includes('?') ? '&' : '?';
+                        corsImg.src = origSrcs[i] + sep + '_cb=' + cacheBust + '_' + i;
+                        corsImg.onload = function () {
+                            try {
+                                const c = document.createElement('canvas');
+                                c.width = this.naturalWidth;
+                                c.height = this.naturalHeight;
+                                c.getContext('2d').drawImage(this, 0, 0);
+                                resolve(c.toDataURL());
+                            } catch (e) {
+                                console.warn('Canvas draw failed for', origSrcs[i], e);
+                                resolve(null);
+                            }
+                        };
+                        corsImg.onerror = () => {
+                            console.warn('CORS image load failed:', origSrcs[i]);
+                            resolve(null);
+                        };
+                    });
+                    if (dataUrl) img.src = dataUrl;
+                    // If null, img.src stays as original; html2canvas will leave it blank (no taint)
                 }));
 
-                // Brief pause to allow the browser to re-render images whose src was replaced with a data URL
-                await new Promise(r => setTimeout(r, 150));
+                // Wait two animation frames so the browser can render the updated data-URL srcs
+                // before html2canvas captures the DOM. Data URLs load synchronously in most
+                // browsers, but requestAnimationFrame gives any pending layout work time to finish.
+                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
                 const opts = {
                     useCORS: true,
@@ -1143,10 +1163,9 @@
                 const scaledW = Math.round(contentW * scale);
                 const scaledMapH = Math.round(mapCanvas.height * scale);
                 const scaledCardsH = Math.round(cardsCanvas.height * scale);
-                const scaledTotalH = scaledMapH + scaledCardsH;
 
                 // Final canvas: A4 width, height at least A4 height
-                const finalH = Math.max(A4_H, scaledTotalH + MARGIN * 2);
+                const finalH = Math.max(A4_H, scaledMapH + scaledCardsH + MARGIN * 2);
                 const finalCanvas = document.createElement('canvas');
                 finalCanvas.width = A4_W;
                 finalCanvas.height = finalH;
@@ -1160,11 +1179,14 @@
                 ctx.drawImage(mapCanvas, offsetX, MARGIN, scaledW, scaledMapH);
                 ctx.drawImage(cardsCanvas, offsetX, MARGIN + scaledMapH, scaledW, scaledCardsH);
 
-                const link = document.createElement('a');
                 const today = new Date().toISOString().slice(0, 10);
+                const link = document.createElement('a');
                 link.download = `templomTerkep-${today}.png`;
                 link.href = finalCanvas.toDataURL('image/png');
+                // Append to DOM before clicking: required by some browsers for programmatic download
+                document.body.appendChild(link);
                 link.click();
+                document.body.removeChild(link);
             } finally {
                 document.body.classList.remove('export-mode');
                 btn.disabled = false;
