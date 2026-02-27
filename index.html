@@ -93,6 +93,26 @@
             line-height: 18px;
             color: #555;
         }
+
+        .church-card-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .church-img-placeholder {
+            height: 200px;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            color: #999;
+        }
+
+        #church-cards-section {
+            margin-top: 30px;
+        }
     </style>
 </head>
 
@@ -207,6 +227,12 @@
                         <div id="map"></div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div id="church-cards-section" style="display: none;">
+            <h3 class="mb-3">Templomok részletesen</h3>
+            <div id="church-cards" class="row">
             </div>
         </div>
     </div>
@@ -341,6 +367,9 @@
 
             // Szűrő panel megjelenítése
             document.getElementById('filter-options').style.display = 'block';
+
+            // Templomok kártyáinak frissítése a térkép alatt
+            updateChurchCards();
         }
 
         // Térkép nézet beállítása a látható templomokhoz
@@ -629,6 +658,9 @@
                 // Miserendek pozicionálása az átfedések elkerülésével
                 positionMassSchedules(visibleChurches);
             }
+
+            // Templomok kártyáinak frissítése a térkép alatt
+            updateChurchCards();
         }
 
         // Megtalálja a legészakibb, legdélibb, legkeletibb és legnyugatibb templomokat
@@ -784,6 +816,93 @@
 
         // "Miserend megjelenítése a térképen" jelölőnégyzet kezelése
         document.getElementById('show-mass-schedule').addEventListener('change', updateChurchMarkers);
+
+        // HTML különleges karakterek escapelése XSS ellen
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Templomok kártyáinak megjelenítése a térkép alatt
+        function updateChurchCards() {
+            const section = document.getElementById('church-cards-section');
+            const container = document.getElementById('church-cards');
+
+            // Látható templomok összegyűjtése
+            const visibleChurches = allChurches.filter(church => {
+                const churchIdStr = (church.id || "").toString();
+                return visibleChurchIds.has(churchIdStr);
+            });
+
+            if (visibleChurches.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            container.innerHTML = '';
+
+            visibleChurches.forEach(church => {
+                const churchId = church.id;
+                const name = church.nev || 'Ismeretlen templom';
+                const address = church.helyszin || church.cim || '';
+
+                // Miserend formázása
+                const massSchedule = church.misek && church.misek.length > 0
+                    ? church.misek.map(mass => {
+                        const idopontSzoveg = mass.idopont || '';
+                        // Dátum előtag eltávolítása (ÉÉÉÉ-HH-NN formátum)
+                        const timeOnly = idopontSzoveg.replace(/^\d{4}-\d{2}-\d{2}\s+/, '');
+                        // Az "ee:" jelzés előesti misét jelöl, azt eredeti formájában hagyjuk
+                        if (timeOnly.includes('ee:')) {
+                            return escapeHtml(timeOnly);
+                        }
+                        return escapeHtml(timeOnly.replace(/:\d{2}$/, ''));
+                    }).join(', ')
+                    : 'Nincs miserend';
+
+                // Kép URL kiszámítása
+                const safeName = escapeHtml(name);
+                let imageHtml;
+                if (church.kepek && church.kepek.length > 0) {
+                    const kepUrl = typeof church.kepek[0] === 'string'
+                        ? church.kepek[0]
+                        : (church.kepek[0].url || church.kepek[0].src || '');
+                    imageHtml = kepUrl
+                        ? `<img src="${escapeHtml(kepUrl)}" class="card-img-top church-card-img" alt="${safeName}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                           <div class="church-img-placeholder card-img-top" style="display: none;">⛪</div>`
+                        : `<div class="church-img-placeholder card-img-top">⛪</div>`;
+                } else {
+                    const kepUrl = `https://miserend.hu/img/templomok/${encodeURIComponent(churchId)}/cover.jpg`;
+                    imageHtml = `<img src="${escapeHtml(kepUrl)}" class="card-img-top church-card-img" alt="${safeName}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                 <div class="church-img-placeholder card-img-top" style="display: none;">⛪</div>`;
+                }
+
+                const col = document.createElement('div');
+                col.className = 'col-md-4 col-sm-6 mb-4';
+                col.innerHTML = `
+                    <div class="card h-100">
+                        ${imageHtml}
+                        <div class="card-body">
+                            <h5 class="card-title">${safeName}</h5>
+                            ${address ? `<p class="card-text text-muted"><small>📍 ${escapeHtml(address)}</small></p>` : ''}
+                            <p class="card-text">
+                                <strong>Miserend:</strong><br>
+                                <span>${massSchedule}</span>
+                            </p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="https://miserend.hu/temple/${encodeURIComponent(churchId)}" target="_blank" class="btn btn-sm btn-outline-primary">Részletek a miserend.hu-n</a>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+        }
 
         // Térkép eseménykezelők a miserend frissítéséhez
         map.on('moveend', function () {
