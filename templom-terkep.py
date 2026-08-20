@@ -75,7 +75,7 @@ def get_city_map(
     fig.tight_layout()
     ax.set_xlim(west, east)
     ax.set_ylim(south, north)
-    source = ctx.providers.CartoDB.VoyagerNoLabels if not color_map else ctx.providers.CartoDB.Voyager
+    source = ctx.providers.CartoDB.Positron if not color_map else ctx.providers.OpenStreetMap.Mapnik
     ctx.add_basemap(ax, source=source, crs='EPSG:4326')
 
     if show_center:
