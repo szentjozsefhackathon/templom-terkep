@@ -75,7 +75,9 @@ def get_city_map(
     fig.tight_layout()
     ax.set_xlim(west, east)
     ax.set_ylim(south, north)
-    source = ctx.providers.CartoDB.Positron if not color_map else ctx.providers.OpenStreetMap.Mapnik
+    # OpenStreetMap (Mapnik) a színes térképhez, a visszafogottabb, világos
+    # változathoz az Esri szürke alaptérképe. Egyik sem igényel API-kulcsot.
+    source = ctx.providers.Esri.WorldGrayCanvas if not color_map else ctx.providers.OpenStreetMap.Mapnik
     ctx.add_basemap(ax, source=source, crs='EPSG:4326')
 
     if show_center:

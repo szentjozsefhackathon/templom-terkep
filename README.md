@@ -7,7 +7,7 @@ Honlap: https://szentjozsefhackathon.github.io/templom-terkep
 
 - Poetry telepítés: `pip install poetry`
 - Függőség telepítés: `poetry install`
-- Indítás: `poetry run python templom-terkep.py`
+- Indítás: `poetry run python templom_terkep.py`
 
 ## Kapcsolók
 
@@ -24,7 +24,7 @@ Honlap: https://szentjozsefhackathon.github.io/templom-terkep
 2. [Miserend.hu](miserend.hu) API NearBy végpontjáról lekéri a közeli templomokat
     - Ha a `--select-churches` kapcsoló be van kapcsolva, interaktívan kiválaszthatja a megjeleníteni kívánt templomokat.
 3. A templomok pozíciói alapján kiszámolja a szükséges térkép nagyságát
-4. 'Csempekiszolgálótól' letölti a térképcsempéket, hogy szép térképet eredményezzen. (színesebb esetén: `OSM Mapnik`, kevésbé színes esetén: `CartoDB Positron`)
+4. 'Csempekiszolgálótól' letölti a térképcsempéket, hogy szép térképet eredményezzen. (színesebb esetén: `OSM Mapnik`, kevésbé színes esetén: `Esri World Gray Canvas`). Egyik csempeszolgáltató sem igényel API-kulcsot.
 5. Ráhelyezi a térképre a templomok címkéjét
 6. Elmenti a térképet
 
